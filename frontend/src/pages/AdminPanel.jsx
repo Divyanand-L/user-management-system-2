@@ -26,13 +26,6 @@ const AdminPanel = () => {
     hasNextPage: false,
     hasPrevPage: false
   });
-  
-  // Search and filter state
-  const [filters, setFilters] = useState({
-    search: '',
-    state: '',
-    city: ''
-  });
 
   // Fetch users - wrapped in useCallback to prevent recreating on every render
   const fetchUsers = useCallback(async (page = 1) => {
@@ -42,26 +35,29 @@ const AdminPanel = () => {
         page,
         limit: pagination.limit,
       };
-      
-      // Add filters if they exist
-      if (filters.search) params.name = filters.search;
-      if (filters.state) params.state = filters.state;
-      if (filters.city) params.city = filters.city;
 
       const response = await api.get('/users', { params });
-      const data = response.data.data;
       
-      setUsers(data.users);
-      setPagination(data.pagination);
+      // Backend returns: { data: [...users], pagination: {...} }
+      setUsers(response.data.data || []);
+      setPagination({
+        currentPage: response.data.pagination?.page || 1,
+        totalPages: response.data.pagination?.pages || 1,
+        totalUsers: response.data.pagination?.total || 0,
+        limit: response.data.pagination?.limit || 10,
+        hasNextPage: response.data.pagination?.page < response.data.pagination?.pages,
+        hasPrevPage: response.data.pagination?.page > 1
+      });
     } catch (err) {
+      console.error('Fetch users error:', err);
       setToast({ 
         type: 'error', 
-        message: err.response?.data?.error?.message || 'Failed to fetch users' 
+        message: err.response?.data?.message || err.response?.data?.error?.message || 'Failed to fetch users' 
       });
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.limit]);
+  }, [pagination.limit]);
 
   // Initial load - only once on mount
   useEffect(() => {
@@ -98,12 +94,6 @@ const AdminPanel = () => {
     };
   }, [fetchUsers, pagination.currentPage]);
 
-  // Handle search submit
-  const handleSearch = (e) => {
-    e.preventDefault();
-    fetchUsers(1); // Reset to page 1 when searching
-  };
-
   // Handle pagination
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -116,16 +106,16 @@ const AdminPanel = () => {
     try {
       setActionLoading(prev => ({ ...prev, [userId]: true }));
       
-      const endpoint = action === 'promote' 
-        ? `/users/${userId}/promote-admin` 
-        : `/users/${userId}/demote-admin`;
+      const newRole = action === 'promote' ? 'admin' : 'user';
       
-      await api.patch(endpoint);
+      await api.patch(`/users/${userId}/role`, {
+        role: newRole
+      });
       
       // Update user in local state without refetching
       setUsers(prev => prev.map(user => 
         user._id === userId 
-          ? { ...user, role: action === 'promote' ? 'admin' : 'user' }
+          ? { ...user, role: newRole }
           : user
       ));
       
@@ -201,58 +191,6 @@ const AdminPanel = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Search & Filters</h2>
-          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={filters.search}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filter by state..."
-              value={filters.state}
-              onChange={(e) => setFilters(prev => ({ ...prev, state: e.target.value }))}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Filter by city..."
-              value={filters.city}
-              onChange={(e) => setFilters(prev => ({ ...prev, city: e.target.value }))}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Search
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters({ search: '', state: '', city: '' });
-                  fetchUsers(1);
-                }}
-                className="px-4 py-2 flex items-center justify-center gap-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Clear
-              </button>
-            </div>
-          </form>
-        </div>
-
         {/* Users Table */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">

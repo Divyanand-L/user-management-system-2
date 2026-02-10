@@ -4,6 +4,7 @@ const Button = ({
   variant = 'primary',
   loading = false,
   disabled = false,
+  className = '',
   ...props 
 }) => {
   const variants = {
@@ -19,10 +20,13 @@ const Button = ({
       disabled={disabled || loading}
       className={`
         ${variants[variant]}
-        font-bold py-2 px-4 rounded
-        focus:outline-none focus:shadow-outline
+        font-bold py-4 px-6 rounded-xl
+        focus:outline-none focus:ring-4 focus:ring-opacity-50
         disabled:opacity-50 disabled:cursor-not-allowed
-        transition-colors duration-200
+        transition-all duration-200
+        shadow-md hover:shadow-lg
+        transform hover:scale-[1.02] active:scale-[0.98]
+        ${className}
       `}
       {...props}
     >
